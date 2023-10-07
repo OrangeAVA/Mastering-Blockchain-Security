@@ -1,0 +1,10 @@
+contract SafeTest is Test {
+    // ...
+
+    function testFuzz_Withdraw(uint256 amount) public {
+        payable(address(safe)).transfer(amount);
+        uint256 preBalance = address(this).balance;
+        safe.withdraw();
+        uint256 postBalance = address(this).balance;
+        assertEq(preBalance + amount, postBalance);
+    }
